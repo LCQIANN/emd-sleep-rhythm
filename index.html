@@ -9,16 +9,22 @@
 </head>
 <body>
 <header class="hero">
-  <p class="kicker">為 2026/09/24 黃鍔院士演講「EMD 在睡眠上的研究」所做的預習網站</p>
-  <h1>睡眠不是幾個階段，<br>而是一整晚連續變化的節律</h1>
-  <p class="lead">臨床睡眠分期（Wake / N1 / N2 / N3 / REM）是人用 30 秒一格貼上去的<strong>離散標籤</strong>；腦波本身卻是<strong>非線性、非穩態</strong>的連續訊號。經驗模態分解（Empirical Mode Decomposition, EMD）不預設任何基底，直接讓訊號自己說出它含有哪些節律。這個網站用四個可以動手操作的實驗，解釋 EMD 為什麼能把睡眠研究從「貼標籤」推進到「量節律」。所有演算法都以原生 JavaScript 在你的瀏覽器裡即時計算。</p>
-  <nav class="toc">
-    <a href="#lab1">1. 手繪一條波，看它被拆開</a>
-    <a href="#lab2">2. 篩選過程一步一步看</a>
-    <a href="#lab3">3. 連續睡眠深度 × iPDF × 慢波量</a>
-    <a href="#lab4">4. HHSA：慢振盪如何調控紡錘波</a>
-    <a href="#papers">5. 論文與意義</a>
-  </nav>
+  <canvas id="heroCv"></canvas>
+  <div class="heroInner">
+    <p class="kicker">2026 / 09 / 24 · 黃鍔院士演講「EMD 在睡眠上的研究」預習實驗室</p>
+    <h1 class="big"><span class="grad">睡眠的節律</span><br><span class="sub">把腦波拆回它自己的呼吸</span></h1>
+    <p class="lead">臨床分期是每 30 秒貼一張<strong>離散標籤</strong>；腦波卻是<strong>非線性、非穩態</strong>的連續訊號。經驗模態分解（EMD）不預設任何基底，讓訊號自己說出它含有哪些節律。背景這條白線是一段合成睡眠腦波，下方彩色的線是它被 EMD 即時拆出的 IMF，一直在流動。</p>
+    <div class="pills"><span>手繪即時分解</span><span>篩選逐步動畫</span><span>連續睡眠深度</span><span>iPDF 峰度</span><span>EEMD 慢波量</span><span>HHSA 兩層分解</span><span>Hilbert 時頻譜</span><span>自我測驗</span></div>
+    <nav class="toc">
+      <a href="#lab1">1. 手繪一條波</a>
+      <a href="#lab2">2. 篩選過程</a>
+      <a href="#lab3">3. 睡眠深度 × iPDF × 慢波量</a>
+      <a href="#lab4">4. HHSA 耦合</a>
+      <a href="#quiz">✓ 測驗</a>
+      <a href="#papers">5. 論文與意義</a>
+    </nav>
+    <a class="scrollCue" href="#lab1">↓ 往下捲動開始實驗</a>
+  </div>
 </header>
 
 <main>

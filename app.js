@@ -324,3 +324,44 @@ $("reseed").onclick = () => { seedBase = (seedBase * 31 + 17) % 100000; runSleep
 // ---------- 啟動 ----------
 window.addEventListener("resize", () => { padDraw(); if (padSignal) setPadSignal(padSignal, "重新繪製"); runSleep(); });
 padDraw(); demo(3); runSleep();
+
+// ---------- 首頁動畫：流動的腦波與它的 IMF ----------
+(function hero() {
+  const cv = $("heroCv"); if (!cv) return;
+  const ctx = cv.getContext("2d");
+  const layers = [
+    { f: 13, a: 10, c: "#ff8fa3", burst: true },
+    { f: 10, a: 14, c: "#8be28b" },
+    { f: 6, a: 18, c: "#ffd166" },
+    { f: 1.6, a: 26, c: "#c3a6ff" },
+    { f: 0.8, a: 40, c: "#7cc4ff" }
+  ];
+  let t0 = performance.now();
+  function frame(now) {
+    const W = cv.clientWidth, H = cv.clientHeight;
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    ctx.clearRect(0, 0, W, H);
+    const t = (now - t0) / 1000, n = 400, secs = 8;
+    const comp = new Float64Array(n);
+    layers.forEach((L, k) => {
+      const y0 = H * (0.30 + 0.12 * k);
+      ctx.beginPath(); ctx.strokeStyle = L.c; ctx.lineWidth = 1.6; ctx.globalAlpha = 0.85;
+      for (let i = 0; i < n; i++) {
+        const tt = t + secs * i / n;
+        let env = 1;
+        if (L.burst) env = Math.max(0, Math.sin(2 * Math.PI * 0.25 * tt)) ** 4 * (0.5 + 0.5 * Math.cos(2 * Math.PI * 0.8 * tt));
+        const v = L.a * env * Math.sin(2 * Math.PI * L.f * tt + k);
+        comp[i] += v;
+        ctx[i ? "lineTo" : "moveTo"](W * i / (n - 1), y0 - v * 1.2);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 0.9; ctx.fillStyle = L.c; ctx.font = "11px sans-serif"; ctx.fillText(`IMF ${k + 1} · ${L.f} Hz`, 12, y0 - L.a * 1.2 - 4);
+    });
+    ctx.globalAlpha = 1; ctx.beginPath(); ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 2;
+    for (let i = 0; i < n; i++) ctx[i ? "lineTo" : "moveTo"](W * i / (n - 1), H * 0.14 - comp[i] * 0.55);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,.7)"; ctx.fillText("合成睡眠腦波（原始訊號）", 12, H * 0.14 - 50);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
