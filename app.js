@@ -209,7 +209,7 @@ function runSleep() {
   const fracBig = cnt / N; const isN3 = fracBig > 0.2 && !rem;
   drawSwa(swa, fracBig, isN3);
   $("swaInfo").textContent = `EMD 慢波能量比 = ${(100 * swa).toFixed(1)}%（連續）。AASM 式判準：慢波幅度 > 75 μV 的時間佔 ${(100 * fracBig).toFixed(0)}% ${isN3 ? "> 20% → 貼上 N3" : "≤ 20% → 不是 N3"}（二元）。拖動滑桿會發現：標籤在某一點突然翻轉，而慢波量是平滑變化的。`;
-  runHhsa(imfs, freqs, d, rem);
+  runHhsa();
 }
 let lastRows = 0, lastX = null, selectedImf = 1;
 $("eegImfs").addEventListener("click", e => {
@@ -282,11 +282,17 @@ function drawSwa(swa, frac, isN3) {
   ctx.font = "12px sans-serif"; ctx.fillStyle = "#9aa5b8"; ctx.fillText("同一段腦波，一個給連續數值，一個只給是 / 否。", 10, 188);
 }
 // ---------- 實驗 4：HHSA ----------
-function runHhsa(imfs, freqs, d, rem) {
+function runHhsa() {
+  // 第 4 節獨立：固定以 N2 深度（0.6）合成腦波，只受本節的慢振盪頻率與耦合強度滑桿影響
+  const p = P();
+  const x = synth(0.6, false);
+  const { imfs } = L.emd(x, { maxImf: p.maxImf, sd: p.sd });
+  const freqs = imfs.map(imf => L.meanFreq(imf, FS));
+  const d = 0.6, rem = false;
   let k = -1, best = -1;
   imfs.forEach((imf, i) => { if (freqs[i] >= 10 && freqs[i] <= 17) { const e = L.energy(imf); if (e > best) { best = e; k = i; } } });
   const cv = $("hhsa");
-  if (k < 0 || rem || (d < 0.3 && !P().manual)) { plotRows(cv, [{ y: new Float64Array(N), color: "#9aa5b8", label: "目前深度沒有明顯的紡錘波 IMF。把滑桿拉到 N2–N3（約 45–75）並取消 REM。" }]); $("hhsaInfo").textContent = ""; return; }
+  if (k < 0) { plotRows(cv, [{ y: x, color: "#9aa5b8", label: "這段腦波沒有找到 10–17 Hz 的紡錘波 IMF，按「換一段腦波」再試。" }]); $("hhsaInfo").textContent = ""; return; }
   const carrier = imfs[k];
   const { amp } = L.hilbert(carrier, FS);
   // 包絡線去均值後做第二層 EMD

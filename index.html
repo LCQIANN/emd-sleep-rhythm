@@ -86,7 +86,7 @@
   <h2><span class="num">3</span> 連續睡眠深度 × iPDF × 慢波量</h2>
   <p>這裡不用五個按鈕切換分期，而是給你一根<strong>連續的「睡眠深度」滑桿</strong>。合成腦波依照睡眠生理連續改變：清醒時 α 波（8–12 Hz）與眨眼、肌電等陣發性干擾；入睡後 θ 波（4–7 Hz）浮現；N2 出現 12–15 Hz 紡錘波；越深越多高振幅 δ 慢波（0.5–2 Hz）。拖動滑桿，觀察三件事：IMF 如何自動對應到節律、每個尺度的機率密度（iPDF）如何從「尖峭厚尾」變回「高斯」、以及 EMD 量出的慢波量如何比 N3 的二元標籤更連續。</p>
   <div class="controls">
-    <label>睡眠深度 <input type="range" id="depth" min="0" max="100" value="20"> <span id="depthLabel"></span></label>
+    <label>睡眠深度 <input type="range" id="depth" min="0" max="100" value="55"> <span id="depthLabel"></span></label>
     <label><input type="checkbox" id="rem"> REM 快速動眼期</label>
     <label><input type="checkbox" id="useEemd"> 用 EEMD（集成 8 次、白雜訊 0.2σ）抑制模態混疊</label>
     <button id="reseed">換一段腦波</button>
@@ -155,7 +155,7 @@
   <div class="controls">
     <label>慢振盪頻率 <input type="range" id="soF" min="0.3" max="1.5" step="0.1" value="0.8"> <span id="soFLabel">0.8 Hz</span></label>
     <label>耦合強度 <input type="range" id="couple" min="0" max="100" value="70"> <span id="coupleLabel">70%</span></label>
-    <span class="hint">調整後看第二層 IMF 的調幅頻率是否跟著變、耦合關掉時 0.8 Hz 分量是否消失。</span>
+    <span class="hint">本節固定使用一段 N2 深度的合成腦波（不受第 3 節滑桿影響）。調整後看第二層 IMF 的調幅頻率是否跟著變、耦合拉到 0% 時慢振盪分量是否消失。</span>
   </div>
   <div class="row">
     <div class="col wide">
