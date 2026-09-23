@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>睡眠的節律：EMD 互動實驗室</title>
+<meta name="description" content="以黃鍔院士的經驗模態分解（EMD）為核心，用可以互動的演算法解釋睡眠腦波為何需要自適應分解：手繪訊號分解、連續睡眠深度、iPDF 與 HHSA。">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="hero">
+  <p class="kicker">為 2026/09/24 黃鍔院士演講「EMD 在睡眠上的研究」所做的預習網站</p>
+  <h1>睡眠不是幾個階段，<br>而是一整晚連續變化的節律</h1>
+  <p class="lead">臨床睡眠分期（Wake / N1 / N2 / N3 / REM）是人用 30 秒一格貼上去的<strong>離散標籤</strong>；腦波本身卻是<strong>非線性、非穩態</strong>的連續訊號。經驗模態分解（Empirical Mode Decomposition, EMD）不預設任何基底，直接讓訊號自己說出它含有哪些節律。這個網站用四個可以動手操作的實驗，解釋 EMD 為什麼能把睡眠研究從「貼標籤」推進到「量節律」。所有演算法都以原生 JavaScript 在你的瀏覽器裡即時計算。</p>
+  <nav class="toc">
+    <a href="#lab1">1. 手繪一條波，看它被拆開</a>
+    <a href="#lab2">2. 篩選過程一步一步看</a>
+    <a href="#lab3">3. 連續睡眠深度 × iPDF × 慢波量</a>
+    <a href="#lab4">4. HHSA：慢振盪如何調控紡錘波</a>
+    <a href="#papers">5. 論文與意義</a>
+  </nav>
+</header>
+
+<main>
+<section id="lab1" class="lab">
+  <h2><span class="num">1</span> 手繪一條波，看它被拆開</h2>
+  <p>在下面的畫板用滑鼠或手指<strong>畫任何一條曲線</strong>（快慢混雜、忽大忽小都可以），放開後 EMD 會立刻把它拆成幾個「本質模態函數」（Intrinsic Mode Function, IMF）。每一個 IMF 都是一條「局部對稱、極值數與零交越數相差不超過 1」的振盪，從最快到最慢排列，最後剩下一條不再振盪的殘餘趨勢。</p>
+  <div class="row">
+    <div class="col">
+      <canvas id="pad" class="pad" width="640" height="220"></canvas>
+      <div class="btns">
+        <button id="padClear">清除重畫</button>
+        <button id="padDemo1">範例：快波疊慢波</button>
+        <button id="padDemo2">範例：忽快忽慢（調頻）</button>
+        <button id="padDemo3">範例：陣發性紡錘波</button>
+      </div>
+      <p class="hint" id="padHint">畫板上還沒有訊號。畫一條線，或按一個範例。</p>
+    </div>
+    <div class="col">
+      <canvas id="padImfs" class="stack" width="640" height="420"></canvas>
+    </div>
+  </div>
+  <div class="callout">
+    <strong>為什麼這件事重要？</strong> 傅立葉分析假設訊號是一堆固定頻率、固定振幅的正弦波相加，所以一段「忽快忽慢」的波會被攤成一整片頻帶；EMD 則把它保留成一條頻率隨時間變化的 IMF。睡眠腦波裡的紡錘波（陣發）、慢波（形狀不對稱）、K 複合波都屬於這種傅立葉不擅長的訊號。
+  </div>
+</section>
+
+<section id="lab2" class="lab">
+  <h2><span class="num">2</span> 篩選（sifting）過程一步一步看</h2>
+  <p>EMD 抽出一個 IMF 的方法叫「篩選」：找出所有局部極大值與極小值，各自用三次樣條連成上、下包絡線，取兩條包絡線的平均當作「局部趨勢」，再從訊號減掉它。重複直到剩下的部分夠對稱（本站採用 Huang 1998 的 SD 準則，SD &lt; 0.2 且極值數與零交越數相差 ≤ 1 即停止）。下面對第 1 節的訊號逐步示範。</p>
+  <div class="row">
+    <div class="col wide">
+      <canvas id="sift" class="stack" width="900" height="300"></canvas>
+      <div class="btns">
+        <button id="siftStep">下一次篩選 →</button>
+        <button id="siftFinish">跑完這個 IMF</button>
+        <button id="siftNext">抽出 IMF，處理殘量</button>
+        <button id="siftReset">重置</button>
+      </div>
+      <p class="hint" id="siftInfo"></p>
+    </div>
+  </div>
+  <div class="legend"><span class="sw" style="background:#2b6cb0"></span>目前訊號 h<sub>k</sub> <span class="sw" style="background:#e53e3e"></span>上包絡線 <span class="sw" style="background:#38a169"></span>下包絡線 <span class="sw" style="background:#805ad5"></span>包絡平均 m<sub>k</sub> <span class="sw" style="background:#dd6b20"></span>h<sub>k+1</sub> = h<sub>k</sub> − m<sub>k</sub></div>
+</section>
+
+<section id="lab3" class="lab">
+  <h2><span class="num">3</span> 連續睡眠深度 × iPDF × 慢波量</h2>
+  <p>這裡不用五個按鈕切換分期，而是給你一根<strong>連續的「睡眠深度」滑桿</strong>。合成腦波依照睡眠生理連續改變：清醒時 α 波（8–12 Hz）與眨眼、肌電等陣發性干擾；入睡後 θ 波（4–7 Hz）浮現；N2 出現 12–15 Hz 紡錘波；越深越多高振幅 δ 慢波（0.5–2 Hz）。拖動滑桿，觀察三件事：IMF 如何自動對應到節律、每個尺度的機率密度（iPDF）如何從「尖峭厚尾」變回「高斯」、以及 EMD 量出的慢波量如何比 N3 的二元標籤更連續。</p>
+  <div class="controls">
+    <label>睡眠深度 <input type="range" id="depth" min="0" max="100" value="20"> <span id="depthLabel"></span></label>
+    <label><input type="checkbox" id="rem"> REM 快速動眼期</label>
+    <label><input type="checkbox" id="useEemd"> 用 EEMD（集成 8 次、白雜訊 0.2σ）抑制模態混疊</label>
+    <button id="reseed">換一段腦波</button>
+  </div>
+  <div class="stageBar"><span>Wake</span><span>N1</span><span>N2</span><span>N3</span></div>
+  <div class="row">
+    <div class="col wide">
+      <canvas id="eegRaw" class="stack" width="900" height="130"></canvas>
+      <canvas id="eegImfs" class="stack" width="900" height="520"></canvas>
+      <p class="hint">每條 IMF 右側標示振幅加權的平均瞬時頻率（由 Hilbert 轉換算出）與對應的腦波節律。注意：頻率是<em>算出來</em>的，不是事先指定的濾波帶。</p>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col">
+      <h3>iPDF：各尺度的機率密度形狀（Huang et al., 2025）</h3>
+      <canvas id="kurt" class="stack" width="640" height="200"></canvas>
+      <canvas id="hist" class="stack" width="640" height="220"></canvas>
+      <p class="hint" id="kurtInfo"></p>
+      <div class="callout small">黃鍔院士 2025 年在 <em>Biological Psychology</em> 提出「本質機率密度函數」（intrinsic PDF, iPDF）：對每一個 IMF 分別畫機率密度。清醒、活躍的大腦因為神經活動是陣發性、間歇性的，IMF 值的分佈呈<strong>超高斯</strong>（峰度 &gt; 3、厚尾）；進入深睡與麻醉時，分佈趨近<strong>高斯</strong>（峰度 ≈ 3）。他們以此建立的分類器，區分失智症患者與健康對照的準確率約 87%。</div>
+    </div>
+    <div class="col">
+      <h3>慢波量：連續指標 vs. N3 二元標籤（Sun et al., 2026）</h3>
+      <canvas id="swa" class="stack" width="640" height="200"></canvas>
+      <p class="hint" id="swaInfo"></p>
+      <div class="callout small">2026 年 <em>Sleep Medicine</em> 一篇研究對 Sleep Heart Health Study 823 位受試者的多導睡眠圖做 EEMD，直接量取慢波 IMF 的能量比例。這個連續的「慢波活動」指標與阻塞型睡眠呼吸中止嚴重度（AHI）的相關係數，從傳統 N3 時間比的 −0.27 ~ −0.28 提升到 −0.36 ~ −0.39；在高心血管風險族群更達 −0.70。同一團隊（Guo, Thomas, Peng 等）2022 年也用 EMD 慢波量把 NREM 重新描述成「有慢波 / 無慢波」的雙穩態過程。</div>
+    </div>
+  </div>
+</section>
+
+<section id="lab4" class="lab">
+  <h2><span class="num">4</span> HHSA：慢振盪如何調控紡錘波的振幅</h2>
+  <p>睡眠研究最關鍵的機制之一，是 N2/N3 期的<strong>慢振盪（~0.5–1 Hz）會調控紡錘波（12–15 Hz）的振幅</strong>：紡錘波傾向在慢振盪的上升相位變大，這種「相位—振幅耦合」被認為是記憶固化的載體。傅立葉頻譜只看到 13 Hz 和 0.8 Hz 兩根峰，看不到「誰在調控誰」。黃鍔院士 2016 年提出的<strong>全息希爾伯特譜分析</strong>（Holo-Hilbert Spectral Analysis, HHSA）做法是：第一層 EMD 得到紡錘波 IMF 後，取它的 Hilbert 振幅包絡線，<strong>再對包絡線做一次 EMD</strong>。第二層 IMF 的頻率就是「調幅頻率」，直接量出耦合。</p>
+  <div class="row">
+    <div class="col wide">
+      <canvas id="hhsa" class="stack" width="900" height="460"></canvas>
+      <p class="hint" id="hhsaInfo"></p>
+    </div>
+  </div>
+  <div class="callout">
+    <strong>把兩層合起來看：</strong>HHSA 的結果是一張「載波頻率 × 調幅頻率」的二維譜。在上面的例子裡，一個點會落在（13 Hz, 0.8 Hz），意思是「13 Hz 的紡錘波，被 0.8 Hz 的慢振盪調幅」。這正是跨尺度耦合在 EMD 框架下的自然表達，不需要事先選濾波帶、也不需要假設耦合是線性的。黃鍔團隊 2017 年也用 HHT 的瞬時頻率與振幅改良紡錘波偵測（Liu, Huang &amp; Huang, 2017），F1 分數達 0.73。
+  </div>
+</section>
+
+<section id="papers" class="lab">
+  <h2><span class="num">5</span> 論文與這個主題的意義</h2>
+  <div class="papers">
+    <article><h4>EMD 與 HHT 原始論文</h4><p>Huang NE, Shen Z, Long SR, et al. The empirical mode decomposition and the Hilbert spectrum for nonlinear and non-stationary time series analysis. <em>Proc R Soc Lond A</em> 1998;454:903–995. <a href="https://doi.org/10.1098/rspa.1998.0193" target="_blank" rel="noopener">doi:10.1098/rspa.1998.0193</a></p><p class="why">定義 IMF、篩選過程與 SD 停止準則；第 1、2 節的演算法即依此實作。</p></article>
+    <article><h4>EEMD：以雜訊輔助解決模態混疊</h4><p>Wu Z, Huang NE. Ensemble empirical mode decomposition: a noise-assisted data analysis method. <em>Adv Adapt Data Anal</em> 2009;1(1):1–41. <a href="https://doi.org/10.1142/S1793536909000047" target="_blank" rel="noopener">doi:10.1142/S1793536909000047</a></p><p class="why">第 3 節的 EEMD 選項：對加了白雜訊的訊號重複分解後取平均，讓陣發的紡錘波不再和 θ 波混在同一個 IMF。</p></article>
+    <article><h4>Holo-Hilbert 譜分析（HHSA）</h4><p>Huang NE, Hu K, Yang ACC, Chang HC, Jia D, Liang WK, Yeh JR, Kao CL, Juan CH, Peng CK, Meijer JH, Wang YH, Long SR, Wu Z. On Holo-Hilbert spectral analysis: a full informational spectral representation for nonlinear and non-stationary data. <em>Phil Trans R Soc A</em> 2016;374:20150206. <a href="https://doi.org/10.1098/rsta.2015.0206" target="_blank" rel="noopener">doi:10.1098/rsta.2015.0206</a></p><p class="why">第 4 節的巢狀 EMD：對包絡線再做 EMD，把加法（頻率）與乘法（調幅）交互作用分開表示。論文中以小鼠視交叉上核神經活動示範日夜節律的跨尺度調控。</p></article>
+    <article><h4>iPDF：以本質機率密度量化意識</h4><p>Huang NE, Yuan WS, Yang AC, et al. Quantifying consciousness through intrinsic probability density function. <em>Biol Psychol</em> 2025;200:109101. <a href="https://doi.org/10.1016/j.biopsycho.2025.109101" target="_blank" rel="noopener">doi:10.1016/j.biopsycho.2025.109101</a></p><p class="why">第 3 節 iPDF 面板的依據：清醒 / REM / 深睡 / 麻醉的 IMF 分佈從超高斯走向高斯；分類失智症準確率約 87%。</p></article>
+    <article><h4>睡眠腦波與心率變異的多模態調控</h4><p>Yeh JR, Peng CK, Lo MT, Yeh CH, Chen SC, Wang CY, Lee PL, Kang JH. Investigating the interaction between heart rate variability and sleep EEG using nonlinear algorithms. <em>J Neurosci Methods</em> 2013;219(2):233–239. <a href="https://doi.org/10.1016/j.jneumeth.2013.08.008" target="_blank" rel="noopener">doi:10.1016/j.jneumeth.2013.08.008</a></p><p class="why">中央大學團隊以 HHT（加遮罩訊號抗模態混疊）拆出慢波與快波振盪：慢波頻率反映 NREM 深度，快波振幅可區分 REM；與 HRV 的相關性高於傳統頻譜法。</p></article>
+    <article><h4>EEMD 慢波量勝過 N3 分期</h4><p>Sun H, Chang MC, Guo D, et al. An EEMD-derived slow-wave activity metric improves association with obstructive sleep apnea severity beyond conventional N3 staging. <em>Sleep Med</em> 2026;148:109263. <a href="https://doi.org/10.1016/j.sleep.2026.109263" target="_blank" rel="noopener">doi:10.1016/j.sleep.2026.109263</a></p><p class="why">第 3 節「連續指標 vs. 二元標籤」的依據。</p></article>
+    <article><h4>慢波同步與睡眠狀態轉換</h4><p>Guo D, Thomas RJ, Liu Y, et al. Slow wave synchronization and sleep state transitions. <em>Sci Rep</em> 2022;12:7467. <a href="https://doi.org/10.1038/s41598-022-11513-0" target="_blank" rel="noopener">doi:10.1038/s41598-022-11513-0</a></p><p class="why">用 EMD 慢波量提出 NREM 是「慢波 / 非慢波」雙穩態的觀點。</p></article>
+    <article><h4>HHT 改良紡錘波偵測</h4><p>Liu MY, Huang A, Huang NE. Evaluating and improving automatic sleep spindle detection by using multi-objective evolutionary algorithms. <em>Front Hum Neurosci</em> 2017;11:261. <a href="https://doi.org/10.3389/fnhum.2017.00261" target="_blank" rel="noopener">doi:10.3389/fnhum.2017.00261</a></p><p class="why">在 DREAMS 與 MASS 資料庫比較六種偵測法，Fourier + HHT 混合法 F1 = 0.726–0.737。</p></article>
+    <article><h4>EEMD 單通道自動睡眠分期</h4><p>Hassan AR, Bhuiyan MIH. Automated identification of sleep states from EEG signals by means of ensemble empirical mode decomposition and random under sampling boosting. <em>Comput Methods Programs Biomed</em> 2017;140:201–210. <a href="https://doi.org/10.1016/j.cmpb.2016.12.015" target="_blank" rel="noopener">doi:10.1016/j.cmpb.2016.12.015</a></p><p class="why">Sleep-EDF 資料庫，EEMD 的 IMF 統計動差 + RUSBoost，6 期到 2 期分類準確率 88.1%–98.2%。</p></article>
+    <article><h4>入睡前腦波複雜度預測慢波</h4><p>Hou F, Yu Z, Peng CK, et al. Complexity of wake electroencephalography correlates with slow wave activity after sleep onset. <em>Front Neurosci</em> 2018;12:809. <a href="https://doi.org/10.3389/fnins.2018.00809" target="_blank" rel="noopener">doi:10.3389/fnins.2018.00809</a></p><p class="why">EEMD + 多尺度熵：清醒腦波複雜度越低，入睡越快、早期慢波越多。</p></article>
+  </div>
+  <div class="callout">
+    <h3>所以，EMD 在睡眠上的研究，意義在哪？</h3>
+    <ol>
+      <li><strong>從離散標籤到連續量。</strong>人工分期把整夜切成 30 秒一格的五種標籤；EMD 量出的慢波能量、瞬時頻率、iPDF 峰度都是連續的，而且與臨床結果（如呼吸中止嚴重度）相關更強。</li>
+      <li><strong>不預設濾波帶。</strong>δ、θ、α、σ 的界線是人訂的；EMD 讓每個人、每一晚的腦波自己決定節律在哪裡，這對個體差異大的兒童、老人、病患特別重要。</li>
+      <li><strong>看得見跨尺度耦合。</strong>HHSA 把「誰調控誰」變成可以量的東西，而慢振盪–紡錘波耦合正是睡眠與記憶研究的核心機制。</li>
+      <li><strong>可攜化。</strong>單通道 EEG 甚至心率變異（Ebrahimi et al., 2013）加上 EMD 特徵即可做分期，讓睡眠監測走出實驗室。</li>
+    </ol>
+  </div>
+</section>
+</main>
+
+<footer>
+  <p>所有演算法（極值偵測、自然三次樣條、篩選、EMD、EEMD、FFT、Hilbert 轉換、峰度、直方圖）皆以原生 JavaScript 從頭實作於 <code>emd.js</code>，無任何外部函式庫。腦波為依睡眠生理特徵合成的示範訊號，非真實病人資料。原始碼：<a id="repoLink" href="https://github.com/LCQIANN/emd-sleep-rhythm" target="_blank" rel="noopener">GitHub</a>。</p>
+</footer>
+<script src="emd.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
