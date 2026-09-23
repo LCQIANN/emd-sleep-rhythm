@@ -38,6 +38,9 @@
     </div>
     <div class="col">
       <canvas id="padImfs" class="stack" width="640" height="420"></canvas>
+      <p class="hint">勾選要「加回去」的 IMF，看部分重建：這就是 EMD 當作自適應濾波器的用法（不用事先設定截止頻率）。</p>
+      <div id="padChecks" class="checks"></div>
+      <canvas id="padRecon" class="stack" width="640" height="150"></canvas>
     </div>
   </div>
   <div class="callout">
@@ -53,6 +56,7 @@
       <canvas id="sift" class="stack" width="900" height="300"></canvas>
       <div class="btns">
         <button id="siftStep">下一次篩選 →</button>
+        <button id="siftPlay">▶ 自動播放</button>
         <button id="siftFinish">跑完這個 IMF</button>
         <button id="siftNext">抽出 IMF，處理殘量</button>
         <button id="siftReset">重置</button>
@@ -77,7 +81,19 @@
     <div class="col wide">
       <canvas id="eegRaw" class="stack" width="900" height="130"></canvas>
       <canvas id="eegImfs" class="stack" width="900" height="520"></canvas>
-      <p class="hint">每條 IMF 右側標示振幅加權的平均瞬時頻率（由 Hilbert 轉換算出）與對應的腦波節律。注意：頻率是<em>算出來</em>的，不是事先指定的濾波帶。</p>
+      <p class="hint">每條 IMF 右側標示振幅加權的平均瞬時頻率（由 Hilbert 轉換算出）與對應的腦波節律。注意：頻率是<em>算出來</em>的，不是事先指定的濾波帶。<strong>點任一條 IMF</strong> 可看它的瞬時頻率與瞬時振幅隨時間怎麼變。</p>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col">
+      <h3>點選的 IMF：瞬時頻率（上）與瞬時振幅（下）</h3>
+      <canvas id="instf" class="stack" width="640" height="240"></canvas>
+      <p class="hint" id="instfInfo">點上方任一條 IMF。</p>
+    </div>
+    <div class="col">
+      <h3>Hilbert 時頻譜 vs. 傅立葉頻譜</h3>
+      <canvas id="hspec" class="stack" width="640" height="240"></canvas>
+      <p class="hint">上：Hilbert 譜（時間 × 瞬時頻率，亮度為振幅），能看到紡錘波「何時」出現；下：同一段訊號的 FFT 功率譜只剩頻率軸，時間資訊消失。</p>
     </div>
   </div>
   <div class="row">

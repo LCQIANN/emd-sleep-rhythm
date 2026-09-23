@@ -72,7 +72,20 @@ function setPadSignal(s, name) {
   const rows = imfs.map((imf, k) => ({ y: imf, color: COLORS[k % COLORS.length], label: `IMF ${k + 1}`, right: `平均瞬時頻率 ≈ ${(L.meanFreq(imf, 600 / 6).toFixed(2))} 週 / 秒（設訊號長 6 秒）` }));
   rows.push({ y: residue, color: "#9aa5b8", label: "殘餘趨勢" });
   plotRows($("padImfs"), rows);
+  padParts = [...imfs, residue];
+  const box = $("padChecks"); box.innerHTML = "";
+  padParts.forEach((p, k) => { const lab = document.createElement("label"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = k >= 1; cb.dataset.k = k; cb.addEventListener("change", padRecon); lab.appendChild(cb); lab.appendChild(document.createTextNode(k < imfs.length ? `IMF ${k + 1}` : "殘餘")); box.appendChild(lab); });
+  padRecon();
   $("padHint").textContent = `${name}：拆成 ${imfs.length} 個 IMF 加 1 個殘餘趨勢。IMF 從最快排到最慢，全部相加會精確還原原訊號。`;
+}
+let padParts = [];
+function padRecon() {
+  if (!padSignal || !padParts.length) return;
+  const n = padSignal.length, rec = new Float64Array(n);
+  const on = [...document.querySelectorAll("#padChecks input")].filter(c => c.checked).map(c => +c.dataset.k);
+  on.forEach(k => { for (let i = 0; i < n; i++) rec[i] += padParts[k][i]; });
+  let err = 0, tot = 0; for (let i = 0; i < n; i++) { err += (padSignal[i] - rec[i]) ** 2; tot += padSignal[i] ** 2; }
+  plotRows($("padRecon"), [{ y: rec, color: "#ffb86b", lw: 2, extra: [{ y: padSignal, color: "#7cc4ff55", lw: 1.5 }], label: `部分重建（橘）vs. 原訊號（藍）— 已加回 ${on.length} 個分量，剩餘能量 ${(100 * err / Math.max(tot, 1e-12)).toFixed(1)}%` }]);
 }
 function demo(kind) {
   const N = 600, s = new Float64Array(N);
@@ -102,6 +115,18 @@ function siftRender() {
   $("siftInfo").textContent = `極大值 ${s.max.length} 個、極小值 ${s.min.length} 個；減去平均後零交越 ${s.nZc} 次、極值 ${s.nExt} 個；SD = ${s.sd.toFixed(4)} ${ok ? "→ 已符合 IMF 條件，可抽出 IMF" : "→ 尚未達到 SD < 0.2，繼續篩選"}`;
 }
 $("siftStep").onclick = () => { if (!siftH) return; const s = L.siftOnce(siftH); if (!s) return; siftH = s.next; siftIter++; siftLast = null; siftRender(); };
+let siftTimer = null;
+$("siftPlay").onclick = () => {
+  if (siftTimer) { clearInterval(siftTimer); siftTimer = null; $("siftPlay").textContent = "▶ 自動播放"; return; }
+  $("siftPlay").textContent = "⏸ 停止";
+  siftTimer = setInterval(() => {
+    if (!siftH) return;
+    const s = L.siftOnce(siftH);
+    if (!s) { clearInterval(siftTimer); siftTimer = null; $("siftPlay").textContent = "▶ 自動播放"; return; }
+    if (s.sd < 0.2 && Math.abs(s.nExt - s.nZc) <= 1) { $("siftNext").click(); return; }
+    siftH = s.next; siftIter++; siftRender();
+  }, 700);
+};
 $("siftFinish").onclick = () => { if (!siftH) return; for (let i = 0; i < 50; i++) { const s = L.siftOnce(siftH); if (!s) break; siftH = s.next; siftIter++; if (s.sd < 0.2 && Math.abs(s.nExt - s.nZc) <= 1) break; } siftLast = null; siftRender(); };
 $("siftNext").onclick = () => { if (!siftH || !padSignal) return; /* 目前 h 就是 IMF；殘量 = 上一殘量 − IMF */ const prev = siftResidue || padSignal; const r = new Float64Array(prev.length); for (let i = 0; i < r.length; i++) r[i] = prev[i] - siftH[i]; siftResidue = r; siftH = Float64Array.from(r); siftImfCount++; siftIter = 0; siftLast = null; siftRender(); };
 let siftResidue = null;
@@ -154,6 +179,9 @@ function runSleep() {
   const rows = imfs.map((imf, k) => ({ y: imf, color: COLORS[k % COLORS.length], label: `IMF ${k + 1}`, right: `${freqs[k].toFixed(1)} Hz · ${bandOf(freqs[k])} · 能量 ${(100 * L.energy(imf) / Etot).toFixed(0)}%`, rightColor: COLORS[k % COLORS.length] }));
   rows.push({ y: res.residue, color: "#9aa5b8", label: "殘餘" });
   plotRows($("eegImfs"), rows);
+  lastRows = rows.length; lastX = x;
+  drawInst(Math.min(selectedImf, imfs.length - 1));
+  drawHspec(imfs, x);
   // iPDF
   const kurts = imfs.map(L.kurtosis);
   drawKurt(kurts, freqs);
@@ -170,6 +198,43 @@ function runSleep() {
   drawSwa(swa, fracBig, isN3);
   $("swaInfo").textContent = `EMD 慢波能量比 = ${(100 * swa).toFixed(1)}%（連續）。AASM 式判準：慢波幅度 > 75 μV 的時間佔 ${(100 * fracBig).toFixed(0)}% ${isN3 ? "> 20% → 貼上 N3" : "≤ 20% → 不是 N3"}（二元）。拖動滑桿會發現：標籤在某一點突然翻轉，而慢波量是平滑變化的。`;
   runHhsa(imfs, freqs, d, rem);
+}
+let lastRows = 0, lastX = null, selectedImf = 1;
+$("eegImfs").addEventListener("click", e => {
+  if (!lastImfs) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const k = Math.floor((e.clientY - r.top) / r.height * lastRows);
+  if (k < lastImfs.length) { selectedImf = k; drawInst(k); }
+});
+function drawInst(k) {
+  if (!lastImfs || k < 0 || k >= lastImfs.length) return;
+  const imf = lastImfs[k], { amp, freq } = L.hilbert(imf, FS);
+  const f = Float64Array.from(freq, v => Math.max(0, Math.min(40, v)));
+  const c = COLORS[k % COLORS.length];
+  plotRows($("instf"), [
+    { y: f, color: c, label: `IMF ${k + 1} 瞬時頻率（Hz，0–40 截斷）`, right: `平均 ${L.meanFreq(imf, FS).toFixed(1)} Hz`, rightColor: c },
+    { y: amp, color: "#ffb86b", label: "瞬時振幅（μV）—— 即 HHSA 第二層所用的包絡線" }
+  ]);
+  const mf = L.meanFreq(imf, FS);
+  $("instfInfo").textContent = `IMF ${k + 1}（${bandOf(mf)}）：瞬時頻率會在振幅很小的地方劇烈跳動，這是 Hilbert 轉換在低振幅處的已知特性，所以本站的「平均瞬時頻率」以振幅平方加權。振幅曲線忽高忽低的樣子，就是「陣發性」的直接證據。`;
+}
+function drawHspec(imfs, x) {
+  const cv = $("hspec"), { ctx, w, h } = setup(cv);
+  const top = h * 0.62, fmax = 30, nt = 200, nf = 60;
+  const grid = new Float64Array(nt * nf);
+  imfs.forEach(imf => { const { amp, freq } = L.hilbert(imf, FS); for (let i = 0; i < N; i++) { const ti = Math.floor(i / N * nt), fi = Math.floor(freq[i] / fmax * nf); if (fi >= 0 && fi < nf) grid[ti * nf + fi] += amp[i] * amp[i]; } });
+  let gm = 0; for (const v of grid) if (v > gm) gm = v;
+  const cw = (w - 50) / nt, ch = (top - 20) / nf;
+  for (let ti = 0; ti < nt; ti++) for (let fi = 0; fi < nf; fi++) { const v = Math.sqrt(grid[ti * nf + fi] / gm); if (v < 0.03) continue; ctx.fillStyle = `rgba(124,196,255,${Math.min(1, v * 1.4)})`; ctx.fillRect(45 + ti * cw, 16 + (nf - 1 - fi) * ch, cw + 0.5, ch + 0.5); }
+  ctx.fillStyle = "#9aa5b8"; ctx.font = "11px sans-serif"; [0, 10, 20, 30].forEach(f => ctx.fillText(`${f}Hz`, 8, 20 + (nf - f / fmax * nf) * ch));
+  ctx.fillStyle = "#e8ecf4"; ctx.font = "12px sans-serif"; ctx.fillText("Hilbert 譜（時間 →）", 45, 12);
+  const { f, p } = L.powerSpectrum(x, FS); let pm = 0; const kmax = Math.floor(fmax / (FS / 2) * p.length);
+  for (let k = 1; k < kmax; k++) if (p[k] > pm) pm = p[k];
+  ctx.beginPath(); ctx.strokeStyle = "#ffb86b"; ctx.lineWidth = 1.5;
+  for (let k = 1; k < kmax; k++) { const px = 45 + (w - 50) * f[k] / fmax, py = h - 14 - Math.log10(1 + 9 * p[k] / pm) * (h - top - 30); ctx[k === 1 ? "moveTo" : "lineTo"](px, py); }
+  ctx.stroke();
+  ctx.fillStyle = "#e8ecf4"; ctx.fillText("FFT 功率譜（頻率 →，對數刻度）", 45, top + 8);
+  ctx.fillStyle = "#9aa5b8"; ctx.font = "11px sans-serif"; [0, 5, 10, 15, 20, 25, 30].forEach(fq => ctx.fillText(`${fq}`, 42 + (w - 50) * fq / fmax, h - 2));
 }
 function drawKurt(kurts, freqs) {
   const cv = $("kurt"), { ctx, w, h } = setup(cv);
