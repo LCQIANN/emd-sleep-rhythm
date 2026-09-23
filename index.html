@@ -35,6 +35,11 @@
         <button id="padDemo3">範例：陣發性紡錘波</button>
       </div>
       <p class="hint" id="padHint">畫板上還沒有訊號。畫一條線，或按一個範例。</p>
+      <div class="controls">
+        <label>加入雜訊 <input type="range" id="padNoise" min="0" max="100" value="0"> <span id="padNoiseLabel">0%</span></label>
+        <label><input type="checkbox" id="padEemd"> 改用 EEMD</label>
+      </div>
+      <p class="hint">把雜訊拉高，觀察 IMF 1 如何被雜訊佔據、其他分量是否「混模」（mode mixing）；再勾 EEMD 看集成平均怎麼救回來。</p>
     </div>
     <div class="col">
       <canvas id="padImfs" class="stack" width="640" height="420"></canvas>
@@ -76,6 +81,27 @@
     <label><input type="checkbox" id="useEemd"> 用 EEMD（集成 8 次、白雜訊 0.2σ）抑制模態混疊</label>
     <button id="reseed">換一段腦波</button>
   </div>
+  <details class="controls" style="display:block">
+    <summary>進階：EMD / EEMD 參數</summary>
+    <div class="grid3">
+      <label>SD 停止門檻 <input type="range" id="pSd" min="0.05" max="0.6" step="0.05" value="0.2"> <span id="pSdLabel">0.20</span></label>
+      <label>最多 IMF 數 <input type="range" id="pMax" min="3" max="10" value="8"> <span id="pMaxLabel">8</span></label>
+      <label>EEMD 集成次數 <input type="range" id="pEns" min="2" max="30" value="8"> <span id="pEnsLabel">8</span></label>
+      <label>EEMD 雜訊比例 σ <input type="range" id="pNoise" min="0.05" max="0.6" step="0.05" value="0.2"> <span id="pNoiseLabel">0.20</span></label>
+    </div>
+  </details>
+  <details class="controls" style="display:block">
+    <summary>進階：手動調配腦波成分（勾選後取代滑桿的自動設定）</summary>
+    <label><input type="checkbox" id="manual"> 啟用手動調配</label>
+    <div class="grid3">
+      <label>δ 慢波 0.5–2 Hz <input type="range" id="aDelta" min="0" max="120" value="40"></label>
+      <label>θ 波 6 Hz <input type="range" id="aTheta" min="0" max="40" value="10"></label>
+      <label>α 波 10 Hz <input type="range" id="aAlpha" min="0" max="40" value="10"></label>
+      <label>σ 紡錘波 13 Hz <input type="range" id="aSpin" min="0" max="50" value="25"></label>
+      <label>β 波 21 Hz <input type="range" id="aBeta" min="0" max="20" value="4"></label>
+      <label>白雜訊 <input type="range" id="aNoise" min="0" max="30" value="6"></label>
+    </div>
+  </details>
   <div class="stageBar"><span>Wake</span><span>N1</span><span>N2</span><span>N3</span></div>
   <div class="row">
     <div class="col wide">
@@ -116,6 +142,11 @@
 <section id="lab4" class="lab">
   <h2><span class="num">4</span> HHSA：慢振盪如何調控紡錘波的振幅</h2>
   <p>睡眠研究最關鍵的機制之一，是 N2/N3 期的<strong>慢振盪（~0.5–1 Hz）會調控紡錘波（12–15 Hz）的振幅</strong>：紡錘波傾向在慢振盪的上升相位變大，這種「相位—振幅耦合」被認為是記憶固化的載體。傅立葉頻譜只看到 13 Hz 和 0.8 Hz 兩根峰，看不到「誰在調控誰」。黃鍔院士 2016 年提出的<strong>全息希爾伯特譜分析</strong>（Holo-Hilbert Spectral Analysis, HHSA）做法是：第一層 EMD 得到紡錘波 IMF 後，取它的 Hilbert 振幅包絡線，<strong>再對包絡線做一次 EMD</strong>。第二層 IMF 的頻率就是「調幅頻率」，直接量出耦合。</p>
+  <div class="controls">
+    <label>慢振盪頻率 <input type="range" id="soF" min="0.3" max="1.5" step="0.1" value="0.8"> <span id="soFLabel">0.8 Hz</span></label>
+    <label>耦合強度 <input type="range" id="couple" min="0" max="100" value="70"> <span id="coupleLabel">70%</span></label>
+    <span class="hint">調整後看第二層 IMF 的調幅頻率是否跟著變、耦合關掉時 0.8 Hz 分量是否消失。</span>
+  </div>
   <div class="row">
     <div class="col wide">
       <canvas id="hhsa" class="stack" width="900" height="460"></canvas>
@@ -125,6 +156,11 @@
   <div class="callout">
     <strong>把兩層合起來看：</strong>HHSA 的結果是一張「載波頻率 × 調幅頻率」的二維譜。在上面的例子裡，一個點會落在（13 Hz, 0.8 Hz），意思是「13 Hz 的紡錘波，被 0.8 Hz 的慢振盪調幅」。這正是跨尺度耦合在 EMD 框架下的自然表達，不需要事先選濾波帶、也不需要假設耦合是線性的。黃鍔團隊 2017 年也用 HHT 的瞬時頻率與振幅改良紡錘波偵測（Liu, Huang &amp; Huang, 2017），F1 分數達 0.73。
   </div>
+</section>
+
+<section id="quiz" class="lab">
+  <h2><span class="num">✓</span> 三題自我檢測</h2>
+  <div id="quizBox"></div>
 </section>
 
 <section id="papers" class="lab">

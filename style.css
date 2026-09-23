@@ -48,3 +48,10 @@ code{background:#22304d;padding:1px 6px;border-radius:4px}
 .checks{display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0;font-size:.88rem}
 .checks label{display:flex;gap:4px;align-items:center}
 #eegImfs{cursor:pointer}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px 18px;width:100%;margin-top:8px}
+details summary{cursor:pointer;color:var(--accent)}
+.q{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:12px}
+.q button{margin:4px 6px 4px 0}
+.q .ok{border-color:#38a169;background:#1f3d2e}
+.q .bad{border-color:#e53e3e;background:#3d2323}
+.q .fb{margin-top:8px;color:var(--muted);font-size:.9rem}

@@ -66,9 +66,13 @@ pad.addEventListener("pointerdown", e => { drawing = true; padPts = [padPos(e)];
 pad.addEventListener("pointermove", e => { if (!drawing) return; const p = padPos(e); if (p.x > padPts[padPts.length - 1].x) padPts.push(p); padDraw(); });
 const finish = () => { if (!drawing) return; drawing = false; if (padPts.length > 5) { const N = 600, s = new Float64Array(N); let j = 0; for (let i = 0; i < N; i++) { const x = padPts[0].x + (padPts[padPts.length - 1].x - padPts[0].x) * i / (N - 1); while (j < padPts.length - 2 && padPts[j + 1].x < x) j++; const p0 = padPts[j], p1 = padPts[j + 1]; const t = (x - p0.x) / Math.max(1e-9, p1.x - p0.x); s[i] = -(p0.y + (p1.y - p0.y) * t) + 0.5; } setPadSignal(s, "你畫的曲線"); } };
 pad.addEventListener("pointerup", finish); pad.addEventListener("pointerleave", finish);
-function setPadSignal(s, name) {
+let padBase = null, padName = "";
+function setPadSignal(s0, name) {
+  padBase = s0; padName = name;
+  const nz = +$("padNoise").value / 100; $("padNoiseLabel").textContent = `${Math.round(nz * 100)}%`;
+  const sd = L.std(s0) || 1, s = Float64Array.from(s0, v => v + nz * sd * L.gauss());
   padSignal = s; padDraw(); siftReset();
-  const { imfs, residue } = L.emd(s, { maxImf: 6 });
+  const { imfs, residue } = $("padEemd").checked ? L.eemd(s, 10, 0.2, { maxImf: 6 }) : L.emd(s, { maxImf: 6 });
   const rows = imfs.map((imf, k) => ({ y: imf, color: COLORS[k % COLORS.length], label: `IMF ${k + 1}`, right: `平均瞬時頻率 ≈ ${(L.meanFreq(imf, 600 / 6).toFixed(2))} 週 / 秒（設訊號長 6 秒）` }));
   rows.push({ y: residue, color: "#9aa5b8", label: "殘餘趨勢" });
   plotRows($("padImfs"), rows);
@@ -98,6 +102,8 @@ function demo(kind) {
   setPadSignal(s, ["", "快波疊慢波", "忽快忽慢（調頻）", "陣發性紡錘波"][kind]);
 }
 $("padClear").onclick = () => { padPts = []; padSignal = null; padDraw(); setup($("padImfs")); $("padHint").textContent = "畫板已清除。"; siftReset(); };
+$("padNoise").addEventListener("input", () => { if (padBase) { L.setSeed(99); setPadSignal(padBase, padName); } });
+$("padEemd").addEventListener("change", () => { if (padBase) { L.setSeed(99); setPadSignal(padBase, padName); } });
 $("padDemo1").onclick = () => demo(1); $("padDemo2").onclick = () => demo(2); $("padDemo3").onclick = () => demo(3);
 
 // ---------- 實驗 2：篩選步進 ----------
@@ -136,20 +142,23 @@ $("siftReset").onclick = () => { siftResidue = null; siftReset(); };
 const FS = 100, T = 20, N = FS * T;
 let seedBase = 7;
 function smooth(a, b, x) { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+const P = () => ({ sd: +$("pSd").value, maxImf: +$("pMax").value, ens: +$("pEns").value, noise: +$("pNoise").value, soF: +$("soF").value, couple: +$("couple").value / 100, manual: $("manual").checked });
 function synth(d, rem) {
   L.setSeed(seedBase);
+  const p = P();
   const s = new Float64Array(N);
   const ph = Array.from({ length: 8 }, () => L.rand() * 6.283);
-  const alphaA = rem ? 0 : 22 * smooth(0.35, 0.05, d);
-  const betaA = 6 * (1 - d) + (rem ? 4 : 0);
-  const thetaA = 14 * Math.exp(-(((d - 0.3) / 0.15) ** 2)) + (rem ? 16 : 0);
-  const spinA = rem ? 0 : 30 * Math.exp(-(((d - 0.55) / 0.2) ** 2));
-  const deltaA = rem ? 8 : 90 * smooth(0.4, 1, d);
-  const noiseA = 5 + 6 * (1 - d);
+  let alphaA = rem ? 0 : 22 * smooth(0.35, 0.05, d);
+  let betaA = 6 * (1 - d) + (rem ? 4 : 0);
+  let thetaA = 14 * Math.exp(-(((d - 0.3) / 0.15) ** 2)) + (rem ? 16 : 0);
+  let spinA = rem ? 0 : 30 * Math.exp(-(((d - 0.55) / 0.2) ** 2));
+  let deltaA = rem ? 8 : 90 * smooth(0.4, 1, d);
+  let noiseA = 5 + 6 * (1 - d);
+  if (p.manual) { deltaA = +$("aDelta").value; thetaA = +$("aTheta").value; alphaA = +$("aAlpha").value; spinA = +$("aSpin").value; betaA = +$("aBeta").value; noiseA = +$("aNoise").value; }
   // 紡錘波陣發門控（每 3–5 秒一陣，長 0.8–1.5 秒）
   const bursts = []; let t0 = 1 + L.rand() * 2; while (t0 < T) { bursts.push([t0, 0.8 + L.rand() * 0.7]); t0 += 3 + L.rand() * 2; }
   const blinks = []; if (d < 0.25 && !rem) { let tb = 1 + L.rand() * 3; while (tb < T) { blinks.push(tb); tb += 3 + L.rand() * 4; } }
-  const soF = 0.8;
+  const soF = p.soF, cpl = p.couple;
   for (let i = 0; i < N; i++) {
     const t = i / FS;
     let v = alphaA * (0.7 + 0.3 * Math.sin(2 * Math.PI * 0.3 * t + ph[0])) * Math.sin(2 * Math.PI * 10 * t + ph[1]);
@@ -157,7 +166,7 @@ function synth(d, rem) {
     v += thetaA * Math.sin(2 * Math.PI * 6 * t + ph[3] + (rem ? 0.6 * Math.sin(2 * Math.PI * 0.4 * t) : 0));
     let gate = 0; for (const [b0, len] of bursts) if (t >= b0 && t < b0 + len) gate = Math.sin(Math.PI * (t - b0) / len) ** 2;
     const so = 0.5 * (1 + Math.cos(2 * Math.PI * soF * t + ph[4]));
-    v += spinA * gate * (0.3 + 0.7 * so) * Math.sin(2 * Math.PI * 13 * t + ph[5]);
+    v += spinA * gate * ((1 - cpl) + cpl * so) * Math.sin(2 * Math.PI * 13 * t + ph[5]);
     v += deltaA * (0.7 * Math.cos(2 * Math.PI * soF * t + ph[4]) + 0.4 * Math.sin(2 * Math.PI * 1.6 * t + ph[6]));
     for (const tb of blinks) v += 70 * (1 - d / 0.25) * Math.exp(-(((t - tb) / 0.12) ** 2));
     v += noiseA * L.gauss();
@@ -171,7 +180,10 @@ function runSleep() {
   const d = +$("depth").value / 100, rem = $("rem").checked, useE = $("useEemd").checked;
   $("depthLabel").textContent = `${Math.round(d * 100)}（約 ${stageName(d, rem)}）`;
   const x = synth(d, rem);
-  const res = useE ? L.eemd(x, 8, 0.2, { maxImf: 8 }) : L.emd(x, { maxImf: 8 });
+  const p = P();
+  $("pSdLabel").textContent = p.sd.toFixed(2); $("pMaxLabel").textContent = p.maxImf; $("pEnsLabel").textContent = p.ens; $("pNoiseLabel").textContent = p.noise.toFixed(2);
+  $("soFLabel").textContent = `${p.soF.toFixed(1)} Hz`; $("coupleLabel").textContent = `${Math.round(p.couple * 100)}%`;
+  const res = useE ? L.eemd(x, p.ens, p.noise, { maxImf: p.maxImf, sd: p.sd }) : L.emd(x, { maxImf: p.maxImf, sd: p.sd });
   const imfs = res.imfs; lastImfs = imfs;
   plotRows($("eegRaw"), [{ y: x, color: "#e8ecf4", label: `合成睡眠腦波（${T} 秒、${FS} Hz、μV）—— ${stageName(d, rem)}` }]);
   const freqs = imfs.map(imf => L.meanFreq(imf, FS));
@@ -274,7 +286,7 @@ function runHhsa(imfs, freqs, d, rem) {
   let k = -1, best = -1;
   imfs.forEach((imf, i) => { if (freqs[i] >= 10 && freqs[i] <= 17) { const e = L.energy(imf); if (e > best) { best = e; k = i; } } });
   const cv = $("hhsa");
-  if (k < 0 || rem || d < 0.3) { plotRows(cv, [{ y: new Float64Array(N), color: "#9aa5b8", label: "目前深度沒有明顯的紡錘波 IMF。把滑桿拉到 N2–N3（約 45–75）並取消 REM。" }]); $("hhsaInfo").textContent = ""; return; }
+  if (k < 0 || rem || (d < 0.3 && !P().manual)) { plotRows(cv, [{ y: new Float64Array(N), color: "#9aa5b8", label: "目前深度沒有明顯的紡錘波 IMF。把滑桿拉到 N2–N3（約 45–75）並取消 REM。" }]); $("hhsaInfo").textContent = ""; return; }
   const carrier = imfs[k];
   const { amp } = L.hilbert(carrier, FS);
   // 包絡線去均值後做第二層 EMD
@@ -290,7 +302,23 @@ function runHhsa(imfs, freqs, d, rem) {
   let so = -1, soE = -1; layer2.imfs.forEach((im, j) => { if (amFreqs[j] > 0.4 && amFreqs[j] < 1.5) { const e = L.energy(im); if (e > soE) { soE = e; so = j; } } });
   $("hhsaInfo").textContent = so >= 0 ? `HHSA 讀法：載波 ${freqs[k].toFixed(1)} Hz 的紡錘波，其振幅被第二層 IMF ${so + 1}（${amFreqs[so].toFixed(2)} Hz）調控——這就是慢振盪對紡錘波的相位—振幅耦合，在 Holo-Hilbert 譜上是（${freqs[k].toFixed(0)} Hz, ${amFreqs[so].toFixed(1)} Hz）這一點。更慢的第二層 IMF 則反映紡錘波每幾秒一陣的門控。` : "第二層 IMF 中沒有落在 0.4–1.5 Hz 的調幅分量，試著加深睡眠深度。";
 }
-["depth", "rem", "useEemd"].forEach(id => $(id).addEventListener("input", runSleep));
+["depth", "rem", "useEemd", "pSd", "pMax", "pEns", "pNoise", "manual", "aDelta", "aTheta", "aAlpha", "aSpin", "aBeta", "aNoise", "soF", "couple"].forEach(id => $(id).addEventListener("input", runSleep));
+// ---------- 小測驗 ----------
+const QUIZ = [
+  { q: "EMD 的一個 IMF 必須滿足什麼條件？", opts: ["頻率固定不變", "極值數與零交越數相差不超過 1，且上下包絡平均為零", "振幅固定不變", "與其他 IMF 正交"], ans: 1, fb: "IMF 允許頻率與振幅都隨時間變，只要求局部對稱。這正是它能描述「忽快忽慢」睡眠腦波的原因。" },
+  { q: "為什麼 Wu 與 Huang（2009）要在訊號裡「加白雜訊再平均」（EEMD）？", opts: ["讓訊號看起來更真實", "解決模態混疊：陣發的紡錘波不再和其他節律擠在同一個 IMF", "加快計算速度", "把雜訊濾掉"], ans: 1, fb: "白雜訊填滿所有尺度，逼每次分解都按二進位濾波器組分配，平均後雜訊抵消、模態各歸其位。你可以在第 1 節把雜訊拉高再勾 EEMD 看效果。" },
+  { q: "HHSA 對紡錘波 IMF 的「振幅包絡」再做一次 EMD，第二層 IMF 的頻率代表什麼？", opts: ["紡錘波本身的頻率", "調控紡錘波振幅的慢振盪頻率（跨尺度耦合）", "雜訊的頻率", "取樣頻率"], ans: 1, fb: "這就是 Huang 2016 年提出 Holo-Hilbert 譜的核心：把「誰調控誰」變成可量化的二維譜點，例如（13 Hz, 0.8 Hz）。" }
+];
+(function buildQuiz() {
+  const box = $("quizBox");
+  QUIZ.forEach((it, i) => {
+    const d = document.createElement("div"); d.className = "q";
+    d.innerHTML = `<strong>Q${i + 1}. ${it.q}</strong><div></div><div class="fb"></div>`;
+    const od = d.children[1], fb = d.children[2];
+    it.opts.forEach((o, j) => { const b = document.createElement("button"); b.textContent = o; b.onclick = () => { [...od.children].forEach(x => x.className = ""); b.className = j === it.ans ? "ok" : "bad"; fb.textContent = (j === it.ans ? "答對了！" : "不對。") + it.fb; }; od.appendChild(b); });
+    box.appendChild(d);
+  });
+})();
 $("reseed").onclick = () => { seedBase = (seedBase * 31 + 17) % 100000; runSleep(); };
 
 // ---------- 啟動 ----------
