@@ -80,7 +80,7 @@ function demo(kind) {
     const t = i / 100;
     if (kind === 1) s[i] = Math.sin(2 * Math.PI * 0.5 * t) + 0.4 * Math.sin(2 * Math.PI * 4 * t);
     if (kind === 2) s[i] = Math.sin(2 * Math.PI * (1.5 * t + 0.5 * t * t / 6)) + 0.5 * Math.sin(2 * Math.PI * 0.3 * t);
-    if (kind === 3) { const g = Math.exp(-((t - 1.5) / 0.35) ** 2) + Math.exp(-((t - 4.2) / 0.4) ** 2); s[i] = 0.8 * Math.sin(2 * Math.PI * 0.6 * t) + g * Math.sin(2 * Math.PI * 7 * t) + 0.1 * L.gauss(); }
+    if (kind === 3) { const g = Math.exp(-(((t - 1.5) / 0.35) ** 2)) + Math.exp(-(((t - 4.2) / 0.4) ** 2)); s[i] = 0.8 * Math.sin(2 * Math.PI * 0.6 * t) + g * Math.sin(2 * Math.PI * 7 * t) + 0.1 * L.gauss(); }
   }
   setPadSignal(s, ["", "快波疊慢波", "忽快忽慢（調頻）", "陣發性紡錘波"][kind]);
 }
@@ -117,8 +117,8 @@ function synth(d, rem) {
   const ph = Array.from({ length: 8 }, () => L.rand() * 6.283);
   const alphaA = rem ? 0 : 22 * smooth(0.35, 0.05, d);
   const betaA = 6 * (1 - d) + (rem ? 4 : 0);
-  const thetaA = 14 * Math.exp(-((d - 0.3) / 0.15) ** 2) + (rem ? 16 : 0);
-  const spinA = rem ? 0 : 30 * Math.exp(-((d - 0.55) / 0.2) ** 2);
+  const thetaA = 14 * Math.exp(-(((d - 0.3) / 0.15) ** 2)) + (rem ? 16 : 0);
+  const spinA = rem ? 0 : 30 * Math.exp(-(((d - 0.55) / 0.2) ** 2));
   const deltaA = rem ? 8 : 90 * smooth(0.4, 1, d);
   const noiseA = 5 + 6 * (1 - d);
   // 紡錘波陣發門控（每 3–5 秒一陣，長 0.8–1.5 秒）
@@ -134,7 +134,7 @@ function synth(d, rem) {
     const so = 0.5 * (1 + Math.cos(2 * Math.PI * soF * t + ph[4]));
     v += spinA * gate * (0.3 + 0.7 * so) * Math.sin(2 * Math.PI * 13 * t + ph[5]);
     v += deltaA * (0.7 * Math.cos(2 * Math.PI * soF * t + ph[4]) + 0.4 * Math.sin(2 * Math.PI * 1.6 * t + ph[6]));
-    for (const tb of blinks) v += 70 * (1 - d / 0.25) * Math.exp(-((t - tb) / 0.12) ** 2);
+    for (const tb of blinks) v += 70 * (1 - d / 0.25) * Math.exp(-(((t - tb) / 0.12) ** 2));
     v += noiseA * L.gauss();
     s[i] = v;
   }
